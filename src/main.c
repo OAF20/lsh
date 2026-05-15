@@ -17,7 +17,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <limits.h>
 
 extern char **environ;
 
