@@ -16,6 +16,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <limits.h>
+
+extern char **environ;
+
+#define MAX_HISTORY 100
+
+char *history[MAX_HISTORY];
+int history_count = 0;
 
 /*
   Function Declarations for builtin shell commands:
@@ -23,20 +32,40 @@
 int lsh_cd(char **args);
 int lsh_help(char **args);
 int lsh_exit(char **args);
-
+int lsh_clear(char **args);
+int lsh_mkfile(char **args);
+int lsh_mkdir(char **args);
+int lsh_history(char **args);
+int lsh_pwd(char **args);
+int lsh_echo(char **args);
+int lsh_env(char **args);
 /*
   List of builtin commands, followed by their corresponding functions.
  */
 char *builtin_str[] = {
   "cd",
   "help",
-  "exit"
+  "exit",
+  "clear",
+  "mkfile",
+  "mkdir",
+  "history",
+  "pwd",
+  "echo",
+  "env"
 };
 
 int (*builtin_func[]) (char **) = {
   &lsh_cd,
   &lsh_help,
-  &lsh_exit
+  &lsh_exit,
+  &lsh_clear,
+  &lsh_mkfile,
+  &lsh_mkdir,
+  &lsh_history,
+  &lsh_pwd,
+  &lsh_echo,
+  &lsh_env
 };
 
 int lsh_num_builtins() {
@@ -84,6 +113,12 @@ int lsh_help(char **args)
   return 1;
 }
 
+int lsh_clear(char **args)
+{
+    system("clear");
+    return 1;
+}
+
 /**
    @brief Builtin command: exit.
    @param args List of args.  Not examined.
@@ -92,6 +127,94 @@ int lsh_help(char **args)
 int lsh_exit(char **args)
 {
   return 0;
+}
+
+int lsh_mkfile(char **args)
+{
+  if (args[1] == NULL)
+    {
+        printf("lsh: expected file name\n");
+        return 1;
+    }
+  FILE *fp = fopen(args[1], "w");
+
+  if (fp == NULL)
+  {
+        perror("lsh");
+  }
+  else
+  {
+        fclose(fp);
+  }
+
+    return 1;
+}
+int lsh_mkdir(char **args)
+{
+    if (args[1] == NULL)
+    {
+        printf("lsh: expected directory name\n");
+        return 1;
+    }
+
+    if (mkdir(args[1], 0777) == -1)
+    {
+        perror("lsh");
+    }
+
+    return 1;
+}
+
+int lsh_history(char **args)
+{
+    for (int i = 0; i < history_count; i++)
+    {
+        printf("%d %s\n", i + 1, history[i]);
+    }
+
+    return 1;
+}
+
+int lsh_pwd(char **args)
+{
+    char cwd[1024];
+
+    if (getcwd(cwd, sizeof(cwd)) != NULL)
+    {
+        printf("%s\n", cwd);
+    }
+    else
+    {
+        perror("lsh");
+    }
+
+    return 1;
+}
+
+int lsh_echo(char **args)
+{
+    for (int i = 1; args[i] != NULL; i++)
+    {
+        printf("%s", args[i]);
+
+        if (args[i + 1] != NULL)
+            printf(" ");
+    }
+
+    printf("\n");
+    return 1;
+}
+
+int lsh_env(char **args)
+{
+    extern char **environ;
+
+    for (int i = 0; environ[i] != NULL; i++)
+    {
+        printf("%s\n", environ[i]);
+    }
+
+    return 1;
 }
 
 /**
@@ -232,7 +355,7 @@ char **lsh_split_line(char *line)
       tokens_backup = tokens;
       tokens = realloc(tokens, bufsize * sizeof(char*));
       if (!tokens) {
-		free(tokens_backup);
+		    free(tokens_backup);
         fprintf(stderr, "lsh: allocation error\n");
         exit(EXIT_FAILURE);
       }
@@ -249,19 +372,28 @@ char **lsh_split_line(char *line)
  */
 void lsh_loop(void)
 {
-  char *line;
-  char **args;
-  int status;
+    char *line;
+    char **args;
+    int status;
 
-  do {
-    printf("> ");
-    line = lsh_read_line();
-    args = lsh_split_line(line);
-    status = lsh_execute(args);
+    do {
+        printf("omar-shell> ");
 
-    free(line);
-    free(args);
-  } while (status);
+        line = lsh_read_line();
+
+        if (history_count < MAX_HISTORY)
+        {
+            history[history_count] = strdup(line);
+            history_count++;
+        }
+
+        args = lsh_split_line(line);
+        status = lsh_execute(args);
+
+        free(line);
+        free(args);
+
+    } while (status);
 }
 
 /**
